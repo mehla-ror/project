@@ -1,0 +1,80 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel</title>
+<style>
+body{font-family:Arial;padding:10px;}
+#msgList{border:1px solid #ccc;height:400px;overflow:auto;padding:10px;margin-bottom:10px;}
+.message{padding:5px;margin:2px;background:#f0f0f0;}
+.pinnedMessage{padding:5px;margin:2px;background:#fffa90;}
+button{margin-left:5px;}
+</style>
+</head>
+<body>
+
+<h2>Admin Panel</h2>
+<div id="msgList"></div>
+<button onclick="viewIP()">View My IP Location</button>
+<div id="ipInfo"></div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ===== Firebase Config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyClDpYNMrZMCBFlAYjFHdWAJRvTlpmRjds",
+  authDomain: "secret-app-c988f.firebaseapp.com",
+  databaseURL: "https://secret-app-c988f-default-rtdb.firebaseio.com",
+  projectId: "secret-app-c988f",
+  storageBucket: "secret-app-c988f.firebasestorage.app",
+  messagingSenderId: "218769667228",
+  appId: "1:218769667228:web:8d5fe10b3c25b80e1aa959"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const messagesRef = db.ref('chatMessages');
+
+// ===== Master login =====
+const code = prompt("Enter admin code:");
+if(code !== "JAMESON@420"){ alert("Incorrect!"); window.location.href="index.html"; }
+
+// ===== Display Messages in Admin Panel =====
+function displayAllMessages(){
+    const msgList=document.getElementById("msgList");
+    msgList.innerHTML="";
+    messagesRef.on('child_added', snapshot=>{
+        const msg = snapshot.val();
+        const div=document.createElement("div");
+        div.className = msg.isPinned?"pinnedMessage":"message";
+        div.innerHTML=`<strong>${msg.sender}</strong>: ${msg.content} 
+        ${msg.file?`📎 ${msg.file.name}`:""} 
+        <button onclick="togglePin('${snapshot.key}')">${msg.isPinned?"Unpin":"Pin"}</button>`;
+        msgList.appendChild(div);
+        msgList.scrollTop=msgList.scrollHeight;
+    });
+}
+
+// ===== Toggle Pin =====
+function togglePin(key){
+    messagesRef.child(key).once('value').then(snap=>{
+        const msg = snap.val();
+        messagesRef.child(key).update({isPinned:!msg.isPinned});
+    });
+}
+
+// ===== View IP Location =====
+function viewIP(){
+    fetch('https://ipapi.co/json/').then(res=>res.json()).then(data=>{
+        document.getElementById('ipInfo').innerHTML=
+        `IP: ${data.ip}, City: ${data.city}, Region: ${data.region}, Country: ${data.country_name}`;
+    });
+}
+
+// Load messages
+displayAllMessages();
+</script>
+</body>
+</html>
