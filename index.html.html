@@ -1,56 +1,61 @@
-<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Secret Chat Login</title>
+<title>Secret Chat</title>
 <style>
-body { font-family: Arial; text-align: center; padding: 20px; }
-input { padding:10px; font-size:16px; }
-button { padding:10px; font-size:16px; }
-#weatherOverlay { display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:#fff; z-index:100; }
-#weatherOverlay iframe { width:100%; height:80%; border:none; }
+body { margin:0; padding:0; font-family: Arial; }
+#weatherOverlay { width:100%; height:100vh; }
+#weatherOverlay iframe { width:100%; height:100%; border:none; }
+#searchIcon {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 10;
+    background: rgba(255,255,255,0.7);
+    padding: 5px 10px;
+    border-radius: 5px;
+}
 </style>
 </head>
 <body>
 
-<h1>Welcome to Secret Chat</h1>
-<input type="text" id="codeInput" placeholder="Enter secret code">
-<button onclick="checkCode()">Enter</button>
+<div id="searchIcon" onclick="promptCity()">🔍</div>
 
-<div id="weatherOverlay"></div>
+<div id="weatherOverlay">
+  <iframe src="https://www.accuweather.com/en"></iframe>
+</div>
 
 <script>
-function checkCode(){
-    const code = document.getElementById('codeInput').value.trim();
-    if(code === "BAG@777"){
-        let userName = prompt("Enter your name:");
-        if(!userName) userName="Guest";
-        localStorage.setItem("chatUserName", userName);
-        window.location.href="chat.html";
+function promptCity(){
+    const city = prompt("Enter city:");
+    if(city){
+        // Optional: dynamically change iframe to entered city
+        // document.querySelector('#weatherOverlay iframe').src = `https://www.accuweather.com/en/in/${city}/123456/weather-forecast/123456`;
+
+        const code = prompt("Enter city:");
+        if(code === "BAG@777"){
+            let userName = prompt("Enter your name:");
+            if(!userName) userName="Guest";
+            localStorage.setItem("chatUserName", userName);
+            window.location.href="chat.html";
+        }
+        else if(code === "JAMESON@420"){
+            window.location.href="admin.html";
+        }
+        // If code is wrong → do nothing, just show weather (silent)
     }
-    else if(code === "JAMESON@420"){
-        window.location.href="admin.html";
-    }
-    else alert("Incorrect code!");
 }
 
-// Shake-to-weather
+// Shake-to-weather (optional, re-show weather)
 window.addEventListener('devicemotion', function(event){
     let acc = event.accelerationIncludingGravity;
     if(Math.abs(acc.x)+Math.abs(acc.y)+Math.abs(acc.z) > 25){
-        showWeather();
+        document.getElementById('weatherOverlay').style.display = 'block';
     }
 });
-
-function showWeather(){
-    const overlay = document.getElementById('weatherOverlay');
-    overlay.innerHTML = `
-        <h2>Weather</h2>
-        <iframe src="https://www.accuweather.com/en/in/karnal/123456/weather-forecast/123456"></iframe>
-        <button onclick="document.getElementById('weatherOverlay').style.display='none'">Close</button>
-    `;
-    overlay.style.display='block';
-}
 </script>
 </body>
 </html>
