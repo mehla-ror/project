@@ -3,148 +3,74 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Chat</title>
-
 <style>
 body{margin:0;font-family:-apple-system;background:#f0f2f5}
-.blurScreen{filter:blur(18px)}
+.blur{filter:blur(18px)}
 #app{height:100vh;display:flex;flex-direction:column}
 header{background:#0084ff;color:#fff;padding:14px;text-align:center}
 #messages{flex:1;overflow:auto;padding:10px}
 .msg{max-width:70%;margin:6px 0;padding:10px;border-radius:18px}
 .me{background:#0084ff;color:#fff;margin-left:auto}
 .other{background:#fff;border:1px solid #ddd}
-.time{font-size:10px;opacity:.6}
 #input{display:flex;padding:8px;background:#fff}
 #input input{flex:1;border:none;font-size:16px}
-#input button{border:none;background:none;font-size:20px}
-#calls button{margin:4px}
-video{width:100%}
-#pin{background:#e7f3ff;padding:6px;display:none}
 </style>
 </head>
 
 <body>
 <div id="app">
-<header>Secret Chat</header>
-<div id="pin"></div>
+<header>Chat</header>
 <div id="messages"></div>
-
-<div id="calls">
-<button onclick="startAudio()">📞</button>
-<button onclick="startVideo()">🎥</button>
-<button onclick="toggleMute()">🔇</button>
-<button onclick="toggleCam()">📷</button>
-<button onclick="endCall()">❌</button>
-</div>
-
 <div id="input">
-<input id="text" placeholder="Message…">
+<input id="text" placeholder="Message">
 <button onclick="send()">➤</button>
 </div>
 </div>
 
-<video id="local" autoplay muted playsinline style="display:none"></video>
-<video id="remote" autoplay playsinline></video>
-
-<!-- FIREBASE -->
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
+if(sessionStorage.getItem("auth")!=="user") location.href="index.html";
+
 firebase.initializeApp({
- apiKey:"AIzaSyClDpYNMrZMCBFlAYjFHdWAJRvTlpmRjds",
- authDomain:"secret-app-c988f.firebaseapp.com",
- databaseURL:"https://secret-app-c988f-default-rtdb.firebaseio.com",
- projectId:"secret-app-c988f"
+  apiKey:"AIzaSyClDpYNMrZMCBFlAYjFHdWAJRvTlpmRjds",
+  databaseURL:"https://secret-app-c988f-default-rtdb.firebaseio.com"
 });
-const db=firebase.database();
 
-const user=localStorage.getItem("user")||"Guest";
-const msgRef=db.ref("messages");
-const callRef=db.ref("calls");
-const pinRef=db.ref("pin");
+const db = firebase.database();
+const user = sessionStorage.getItem("user");
+const ref = db.ref("messages");
 
-msgRef.on("child_added",s=>show(s.val()));
-pinRef.on("value",s=>{
- if(s.exists()){pin.style.display="block";pin.innerText="📌 "+s.val().text}
+/* LISTENER (FIXED) */
+ref.limitToLast(50).on("child_added", s=>{
+  const m = s.val();
+  show(m);
 });
 
 function send(){
- if(!text.value) return;
- msgRef.push({user,text:text.value,time:Date.now()});
- text.value="";
+  if(!text.value) return;
+  ref.push({
+    user,
+    text:text.value,
+    time:Date.now()
+  });
+  text.value="";
 }
 
 function show(m){
- if(Date.now()-m.time>86400000) return;
- let d=document.createElement("div");
- d.className="msg "+(m.user===user?"me":"other");
- d.innerHTML=`${m.text}<div class="time">${new Date(m.time).toLocaleTimeString()}</div>`;
- messages.appendChild(d);
- messages.scrollTop=messages.scrollHeight;
+  const d=document.createElement("div");
+  d.className="msg "+(m.user===user?"me":"other");
+  d.innerText=m.text;
+  messages.appendChild(d);
+  messages.scrollTop=messages.scrollHeight;
 }
 
-/* AUTO DELETE */
-msgRef.once("value",s=>{
- s.forEach(c=>{
-  if(Date.now()-c.val().time>86400000) c.ref.remove();
- });
-});
-
-/* BLUR */
+/* BLUR ON BACKGROUND */
 document.addEventListener("visibilitychange",()=>{
- document.body.classList.toggle("blurScreen",document.hidden);
+  document.body.classList.toggle("blur",document.hidden);
 });
-
-/* CALLS */
-let pc,stream,video=false;
-function startAudio(){video=false;start({audio:true})}
-function startVideo(){video=true;start({audio:true,video:true})}
-
-async function start(c){
- stream=await navigator.mediaDevices.getUserMedia(c);
- pc=new RTCPeerConnection();
- stream.getTracks().forEach(t=>pc.addTrack(t,stream));
- pc.ontrack=e=>remote.srcObject=e.streams[0];
- if(video){local.srcObject=stream;local.style.display="block"}
- let o=await pc.createOffer();
- await pc.setLocalDescription(o);
- callRef.set({offer:o});
-}
-
-callRef.on("value",async s=>{
- let d=s.val();
- if(!d){endCall();return}
- if(d.offer&&!pc){
-  pc=new RTCPeerConnection();
-  stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});
-  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
-  pc.ontrack=e=>remote.srcObject=e.streams[0];
-  await pc.setRemoteDescription(d.offer);
-  let a=await pc.createAnswer();
-  await pc.setLocalDescription(a);
-  callRef.update({answer:a});
- }
- if(d.answer&&pc) pc.setRemoteDescription(d.answer);
-});
-
-function endCall(){
- if(stream) stream.getTracks().forEach(t=>t.stop());
- if(pc) pc.close();
- pc=null;stream=null;
- callRef.remove();
- local.style.display="none";
-}
-
-function toggleMute(){
- if(stream) stream.getAudioTracks()[0].enabled^=true;
-}
-function toggleCam(){
- if(stream&&stream.getVideoTracks()[0])
-  stream.getVideoTracks()[0].enabled^=true;
-}
 </script>
 </body>
 </html>
