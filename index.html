@@ -2,41 +2,233 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Weather</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weather Secret App</title>
 <style>
-html,body{margin:0;height:100%}
-iframe{width:100%;height:100%;border:none}
-#search{
- position:fixed;top:15px;right:15px;
- font-size:22px;background:#fff;padding:6px;border-radius:6px;
-}
+html,body{margin:0;height:100%;font-family:-apple-system;background:#f0f2f5;}
+iframe{width:100%;height:100%;border:none;}
+#search{position:fixed;top:15px;right:15px;font-size:22px;background:rgba(255,255,255,.9);padding:8px;border-radius:50%;cursor:pointer;z-index:10;}
+#chat,#admin{display:none;height:100vh;flex-direction:column;}
+#chatHeader{background:#0084ff;color:white;padding:12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 4px rgba(0,0,0,0.2);}
+#messages{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;}
+.msg{max-width:70%;margin:5px 0;padding:10px;border-radius:20px;word-wrap:break-word;line-height:1.3;}
+.me{background:#0084ff;color:white;margin-left:auto;border-bottom-right-radius:2px;}
+.other{background:white;border:1px solid #ddd;margin-right:auto;border-bottom-left-radius:2px;}
+#input{display:flex;padding:8px;background:white;box-shadow:0 -2px 4px rgba(0,0,0,0.1);}
+#input input{flex:1;border:none;font-size:16px;padding:8px;border-radius:20px;background:#f0f2f5;margin-right:6px;}
+#input button{border:none;background:#0084ff;color:white;padding:8px 12px;border-radius:50%;cursor:pointer;font-size:18px;}
+#pinned{display:none;background:#e7f3ff;padding:8px;margin:6px;border-radius:10px;font-weight:bold;color:#0084ff;box-shadow:0 1px 2px rgba(0,0,0,0.1);}
+video{width:100%;max-height:200px;margin-top:5px;border-radius:12px;}
+.blur{filter:blur(18px);}
 </style>
 </head>
-<body>
 
-<div id="search">🔍</div>
-<iframe src="https://www.accuweather.com"></iframe>
+<body>
+<div id="weather">
+  <div id="search">🔍</div>
+  <iframe src="https://www.accuweather.com"></iframe>
+</div>
+
+<!-- CHAT + CALL SECTION -->
+<div id="chat" style="display:flex;flex-direction:column;">
+  <div id="chatHeader">
+    <span>Secret Chat</span>
+    <div>
+      <button onclick="startAudio()">📞</button>
+      <button onclick="startVideo()">🎥</button>
+      <button onclick="toggleMute()">🔇</button>
+      <button onclick="toggleCam()">📷</button>
+      <button onclick="endCall()">❌</button>
+    </div>
+  </div>
+  <div id="pinned"></div>
+  <div id="messages"></div>
+  <div id="input">
+    <input id="text" placeholder="Type a message...">
+    <button onclick="sendMessage()">➤</button>
+  </div>
+  <video id="local" autoplay muted playsinline style="display:none"></video>
+  <video id="remote" autoplay playsinline></video>
+</div>
+
+<!-- ADMIN SECTION -->
+<div id="admin">
+  <div id="chatHeader">Admin Panel</div>
+  <pre id="adminLog"></pre>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
 <script>
-document.getElementById("search").onclick = () => {
+/* ===== AUTH & SECRET CODE ===== */
+const searchBtn=document.getElementById("search");
+searchBtn.onclick = ()=>{
   if(sessionStorage.getItem("auth")) return;
-
-  const city = prompt("Enter city");
-  if(!city) return;
-
-  const code = prompt("Enter secret code");
-  if(code === "BAG@777"){
-    const n = prompt("Enter your name") || "Guest";
+  const city=prompt("Enter city"); if(!city) return;
+  const code=prompt("Enter secret code");
+  if(code==="BAG@777"){
+    const n=prompt("Enter your name")||"Guest";
     sessionStorage.setItem("auth","user");
     sessionStorage.setItem("user",n);
-    location.href="chat.html";
+    startChat();
   }
-  else if(code === "JAMESON@420"){
+  else if(code==="JAMESON@420"){
     sessionStorage.setItem("auth","admin");
-    location.href="admin.html";
+    startAdmin();
   }
 };
-</script>
 
+/* AUTO-LOGIN */
+if(sessionStorage.getItem("auth")==="user") startChat();
+if(sessionStorage.getItem("auth")==="admin") startAdmin();
+
+/* ===== FIREBASE ===== */
+firebase.initializeApp({
+  apiKey:"AIzaSyClDpYNMrZMCBFlAYjFHdWAJRvTlpmRjds",
+  databaseURL:"https://secret-app-c988f-default-rtdb.firebaseio.com"
+});
+const db=firebase.database();
+const msgRef=db.ref("messages");
+const pinRef=db.ref("pinned");
+const callRef=db.ref("calls");
+const user=sessionStorage.getItem("user");
+
+/* ===== CHAT ===== */
+function startChat(){
+  document.getElementById("weather").style.display="none";
+  document.getElementById("chat").style.display="flex";
+
+  msgRef.limitToLast(50).on("child_added",snap=>{
+    const m=snap.val();
+    showMessage(m);
+  });
+
+  pinRef.on("value",snap=>{
+    const p = snap.val();
+    const bar = document.getElementById("pinned");
+    if(p){ bar.style.display="block"; bar.innerText="📌 "+p.text+" ("+p.user+")"; }
+    else bar.style.display="none";
+  });
+}
+
+function sendMessage(){
+  const t=document.getElementById("text");
+  if(!t.value) return;
+  msgRef.push({user,text:t.value,time:Date.now()});
+  t.value="";
+}
+
+function showMessage(m){
+  const d=document.createElement("div");
+  d.className="msg "+(m.user===user?"me":"other");
+  d.innerText=m.user===user?m.text:`${m.user}: ${m.text}`;
+  document.getElementById("messages").appendChild(d);
+  document.getElementById("messages").scrollTop=document.getElementById("messages").scrollHeight;
+}
+
+/* ===== AUTO-DELETE 24H ===== */
+const DAY = 24*60*60*1000;
+function cleanOldMessages(){
+  msgRef.once("value",snap=>{
+    snap.forEach(child=>{
+      const m = child.val();
+      if(!m.pinned && Date.now() - m.time > DAY) child.ref.remove();
+    });
+  });
+}
+setInterval(cleanOldMessages,60000);
+cleanOldMessages();
+
+/* ===== ADMIN ===== */
+function startAdmin(){
+  document.getElementById("weather").style.display="none";
+  document.getElementById("admin").style.display="block";
+  msgRef.on("value",snap=>{
+    document.getElementById("adminLog").innerText=JSON.stringify(snap.val(),null,2);
+  });
+}
+
+/* ===== PINNED MESSAGE ===== */
+function pinMessage(msg){
+  if(sessionStorage.getItem("auth")!=="admin") return;
+  pinRef.set({text:msg.text,user:msg.user,time:Date.now()});
+}
+function unpinMessage(){ if(sessionStorage.getItem("auth")!=="admin") pinRef.remove(); }
+
+/* ===== BLUR ===== */
+document.addEventListener("visibilitychange",()=>{document.body.classList.toggle("blur",document.hidden);});
+
+/* ===== CALLS ===== */
+let pc,stream,video=false;
+function startAudio(){video=false;startCall({audio:true})}
+function startVideo(){video=true;startCall({audio:true,video:true})}
+
+async function startCall(c){
+  if(pc) return;
+  stream=await navigator.mediaDevices.getUserMedia(c);
+  pc=new RTCPeerConnection();
+  stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+  pc.ontrack=e=>remote.srcObject=e.streams[0];
+  if(video){local.srcObject=stream;local.style.display="block"}
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  callRef.set({offer});
+}
+
+callRef.on("value",async snap=>{
+  const d=snap.val();
+  if(!d){endCall();return;}
+  if(d.offer&&!pc){
+    pc=new RTCPeerConnection();
+    stream=await navigator.mediaDevices.getUserMedia({audio:true,video:true});
+    stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+    pc.ontrack=e=>remote.srcObject=e.streams[0];
+    await pc.setRemoteDescription(d.offer);
+    const ans=await pc.createAnswer();
+    await pc.setLocalDescription(ans);
+    callRef.update({answer:ans});
+  }
+  if(d.answer&&pc) pc.setRemoteDescription(d.answer);
+});
+
+function endCall(){
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  if(pc) pc.close();
+  pc=null; stream=null;
+  callRef.remove();
+  local.style.display="none";
+}
+function toggleMute(){if(stream) stream.getAudioTracks()[0].enabled^=true;}
+function toggleCam(){if(stream&&stream.getVideoTracks()[0]) stream.getVideoTracks()[0].enabled^=true;}
+
+/* ===== SHAKE TO WEATHER ===== */
+let lastX=null,lastY=null,lastZ=null,lastTime=0;
+const SHAKE_THRESHOLD=15;
+if(window.DeviceMotionEvent){
+  window.addEventListener('devicemotion', function(event){
+    const acc=event.accelerationIncludingGravity;
+    if(!acc) return;
+    const curTime=new Date().getTime();
+    if((curTime-lastTime)>100){
+      const diffTime=curTime-lastTime;
+      lastTime=curTime;
+      if(lastX!==null){
+        const deltaX=acc.x-lastX;
+        const deltaY=acc.y-lastY;
+        const deltaZ=acc.z-lastZ;
+        const speed=Math.abs(deltaX+deltaY+deltaZ)/diffTime*10000;
+        if(speed>SHAKE_THRESHOLD){
+          document.getElementById("chat").style.display="none";
+          document.getElementById("admin").style.display="none";
+          document.getElementById("weather").style.display="block";
+          endCall();
+        }
+      }
+      lastX=acc.x; lastY=acc.y; lastZ=acc.z;
+    }
+  }, false);
+}
+</script>
 </body>
 </html>
