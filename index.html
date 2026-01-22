@@ -3,74 +3,95 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YouTube Playlist Manager</title>
+<title>Music App</title>
 <style>
-body{font-family:-apple-system;background:#f0f2f5;margin:0;padding:20px;display:flex;flex-direction:column;align-items:center;}
-h1{color:#ff0000;}
-#linkInput{display:flex;gap:10px;margin-bottom:20px;width:100%;max-width:600px;}
-#linkInput input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc;}
-#linkInput button{padding:10px 20px;border:none;background:#ff0000;color:white;border-radius:20px;cursor:pointer;}
+body{margin:0;font-family:-apple-system;background:#121212;color:white;display:flex;flex-direction:column;align-items:center;padding:20px;}
+h1{color:#ff0000;margin-bottom:20px;}
+#searchBar{display:flex;width:100%;max-width:600px;margin-bottom:20px;}
+#searchBar input{flex:1;padding:10px;border-radius:20px;border:none;font-size:16px;}
+#searchBar button{padding:10px 20px;margin-left:10px;border:none;background:#ff0000;color:white;border-radius:20px;cursor:pointer;font-size:16px;}
+#results{display:flex;flex-direction:column;gap:10px;width:100%;max-width:600px;margin-bottom:20px;}
+.result{background:#1e1e1e;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;}
+.result button{padding:6px 12px;border:none;background:#ff0000;color:white;border-radius:12px;cursor:pointer;}
 #playlist{width:100%;max-width:600px;display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
-.song{background:white;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
-.song button{padding:6px 12px;border:none;background:#ff0000;color:white;border-radius:12px;cursor:pointer;}
-iframe{width:100%;height:360px;border:none;border-radius:12px;}
+.song{background:#1e1e1e;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;}
+audio{width:100%;outline:none;border-radius:12px;}
 </style>
 </head>
 <body>
 
-<h1>YouTube Playlist Manager</h1>
+<h1>Music App</h1>
 
-<div id="linkInput">
-  <input id="ytLink" placeholder="Paste YouTube link...">
-  <button onclick="addSong()">Add Song</button>
+<div id="searchBar">
+  <input id="query" placeholder="Search for a song...">
+  <button onclick="search()">Search</button>
 </div>
 
+<div id="results"></div>
+
+<h2>Playlist</h2>
 <div id="playlist"></div>
 
-<div id="player"></div>
+<audio id="player" controls></audio>
 
 <script>
-let songs = [];
+let playlist = [];
 
-function addSong(){
-  const link = document.getElementById("ytLink").value.trim();
-  if(!link) return alert("Paste a YouTube link!");
-  
-  const videoId = extractVideoID(link);
-  if(!videoId) return alert("Invalid YouTube link!");
+async function search(){
+  const q = document.getElementById("query").value.trim();
+  if(!q) return alert("Enter a song name");
 
-  songs.push(videoId);
-  renderPlaylist();
-  document.getElementById("ytLink").value = "";
-}
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(q)}&key=YOUR_API_KEY`);
+  const data = await res.json();
 
-function extractVideoID(url){
-  const regExp = /(?:youtube\.com\/.*v=|youtu\.be\/)([^&]+)/;
-  const match = url.match(regExp);
-  return match ? match[1] : null;
-}
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "";
 
-function renderPlaylist(){
-  const playlistDiv = document.getElementById("playlist");
-  playlistDiv.innerHTML = "";
-  songs.forEach((id,i)=>{
+  data.items.forEach(item=>{
     const div = document.createElement("div");
-    div.className = "song";
-    div.innerHTML = `<span>Song ${i+1}</span>
-                     <div>
-                       <button onclick="play('${id}')">Play</button>
-                       <button onclick="removeSong(${i})">Remove</button>
-                     </div>`;
-    playlistDiv.appendChild(div);
+    div.className = "result";
+    div.innerHTML = `<span>${item.snippet.title}</span>
+                     <button onclick="addToPlaylist('${item.id.videoId}','${item.snippet.title}')">Add</button>`;
+    resultsDiv.appendChild(div);
   });
 }
 
-function play(videoId){
-  document.getElementById("player").innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+function addToPlaylist(videoId,title){
+  playlist.push({videoId,title});
+  renderPlaylist();
+}
+
+function renderPlaylist(){
+  const plDiv = document.getElementById("playlist");
+  plDiv.innerHTML = "";
+  playlist.forEach((s,i)=>{
+    const div = document.createElement("div");
+    div.className = "song";
+    div.innerHTML = `<span>${s.title}</span>
+                     <div>
+                       <button onclick="playAudio('${s.videoId}')">Play</button>
+                       <button onclick="removeSong(${i})">Remove</button>
+                     </div>`;
+    plDiv.appendChild(div);
+  });
+}
+
+function playAudio(videoId){
+  // YouTube embed but hidden to play audio only
+  const url = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0`;
+  if(!document.getElementById("ytframe")){
+    const f = document.createElement("iframe");
+    f.id = "ytframe";
+    f.src = url;
+    f.style.display="none"; // hidden
+    document.body.appendChild(f);
+  } else {
+    document.getElementById("ytframe").src = url;
+  }
 }
 
 function removeSong(index){
-  songs.splice(index,1);
+  playlist.splice(index,1);
   renderPlaylist();
 }
 </script>
