@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Music App</title>
+<title>Ad-Free Music App</title>
 <style>
 body{margin:0;font-family:-apple-system;background:#121212;color:white;display:flex;flex-direction:column;align-items:center;padding:20px;}
 h1{color:#ff0000;margin-bottom:20px;}
@@ -15,12 +15,14 @@ h1{color:#ff0000;margin-bottom:20px;}
 .result button{padding:6px 12px;border:none;background:#ff0000;color:white;border-radius:12px;cursor:pointer;}
 #playlist{width:100%;max-width:600px;display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
 .song{background:#1e1e1e;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;}
-audio{width:100%;outline:none;border-radius:12px;}
+#audioPlayer{width:100%;max-width:600px;margin-top:20px;border-radius:12px;outline:none;background:#222;padding:10px;}
+#controls{display:flex;justify-content:space-between;margin-top:10px;}
+button.control{padding:8px 16px;border:none;border-radius:12px;background:#ff0000;color:white;cursor:pointer;}
 </style>
 </head>
 <body>
 
-<h1>Music App</h1>
+<h1>Ad-Free Music App</h1>
 
 <div id="searchBar">
   <input id="query" placeholder="Search for a song...">
@@ -32,10 +34,18 @@ audio{width:100%;outline:none;border-radius:12px;}
 <h2>Playlist</h2>
 <div id="playlist"></div>
 
-<audio id="player" controls></audio>
+<audio id="audioPlayer" controls></audio>
+<div id="controls">
+  <button class="control" onclick="prev()">⏮️ Previous</button>
+  <button class="control" onclick="next()">⏭️ Next</button>
+</div>
+
+<!-- Hidden YouTube iframe to play audio only -->
+<iframe id="ytframe" style="display:none;"></iframe>
 
 <script>
 let playlist = [];
+let currentIndex = -1;
 
 async function search(){
   const q = document.getElementById("query").value.trim();
@@ -69,30 +79,41 @@ function renderPlaylist(){
     div.className = "song";
     div.innerHTML = `<span>${s.title}</span>
                      <div>
-                       <button onclick="playAudio('${s.videoId}')">Play</button>
+                       <button onclick="playIndex(${i})">Play</button>
                        <button onclick="removeSong(${i})">Remove</button>
                      </div>`;
     plDiv.appendChild(div);
   });
 }
 
+function playIndex(i){
+  currentIndex = i;
+  const videoId = playlist[i].videoId;
+  playAudio(videoId);
+}
+
 function playAudio(videoId){
-  // YouTube embed but hidden to play audio only
-  const url = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0`;
-  if(!document.getElementById("ytframe")){
-    const f = document.createElement("iframe");
-    f.id = "ytframe";
-    f.src = url;
-    f.style.display="none"; // hidden
-    document.body.appendChild(f);
-  } else {
-    document.getElementById("ytframe").src = url;
-  }
+  // Use hidden iframe for audio only
+  const url = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0&loop=1&playlist=${videoId}`;
+  document.getElementById("ytframe").src = url;
 }
 
 function removeSong(index){
   playlist.splice(index,1);
+  if(index===currentIndex) currentIndex=-1;
   renderPlaylist();
+}
+
+function next(){
+  if(playlist.length===0) return;
+  currentIndex = (currentIndex + 1) % playlist.length;
+  playIndex(currentIndex);
+}
+
+function prev(){
+  if(playlist.length===0) return;
+  currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+  playIndex(currentIndex);
 }
 </script>
 
