@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ad-Free Music App</title>
+<title>Music App (No API Key)</title>
 <style>
 body{margin:0;font-family:-apple-system;background:#121212;color:white;display:flex;flex-direction:column;align-items:center;padding:20px;}
 h1{color:#ff0000;margin-bottom:20px;}
@@ -22,7 +22,7 @@ button.control{padding:8px 16px;border:none;border-radius:12px;background:#ff000
 </head>
 <body>
 
-<h1>Ad-Free Music App</h1>
+<h1>Music App (No API Key)</h1>
 
 <div id="searchBar">
   <input id="query" placeholder="Search for a song...">
@@ -40,62 +40,69 @@ button.control{padding:8px 16px;border:none;border-radius:12px;background:#ff000
   <button class="control" onclick="next()">⏭️ Next</button>
 </div>
 
-<!-- Hidden YouTube iframe to play audio only -->
+<!-- Hidden YouTube iframe for audio only -->
 <iframe id="ytframe" style="display:none;"></iframe>
 
 <script>
 let playlist = [];
 let currentIndex = -1;
 
+// Search YouTube via URL (no API key)
 async function search(){
   const q = document.getElementById("query").value.trim();
   if(!q) return alert("Enter a song name");
-
-  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(q)}&key=YOUR_API_KEY`);
-  const data = await res.json();
-
   const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "";
+  resultsDiv.innerHTML = "Searching...";
 
-  data.items.forEach(item=>{
-    const div = document.createElement("div");
-    div.className = "result";
-    div.innerHTML = `<span>${item.snippet.title}</span>
-                     <button onclick="addToPlaylist('${item.id.videoId}','${item.snippet.title}')">Add</button>`;
-    resultsDiv.appendChild(div);
-  });
+  try{
+    const res = await fetch(`https://corsproxy.io/?https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`);
+    const text = await res.text();
+    const videoIds = [...text.matchAll(/\/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m=>m[1]);
+    const uniqueIds = [...new Set(videoIds)].slice(0,5);
+    resultsDiv.innerHTML = "";
+
+    uniqueIds.forEach(id=>{
+      const div = document.createElement("div");
+      div.className="result";
+      div.innerHTML = `<span>Song</span> <button onclick="addToPlaylist('${id}')">Add</button>`;
+      resultsDiv.appendChild(div);
+    });
+  }catch(e){
+    resultsDiv.innerHTML = "Search failed, try again.";
+    console.error(e);
+  }
 }
 
-function addToPlaylist(videoId,title){
-  playlist.push({videoId,title});
+function addToPlaylist(videoId){
+  playlist.push(videoId);
   renderPlaylist();
 }
 
 function renderPlaylist(){
   const plDiv = document.getElementById("playlist");
-  plDiv.innerHTML = "";
-  playlist.forEach((s,i)=>{
+  plDiv.innerHTML="";
+  playlist.forEach((id,i)=>{
     const div = document.createElement("div");
-    div.className = "song";
-    div.innerHTML = `<span>${s.title}</span>
-                     <div>
-                       <button onclick="playIndex(${i})">Play</button>
-                       <button onclick="removeSong(${i})">Remove</button>
-                     </div>`;
+    div.className="song";
+    div.innerHTML=`<span>Song ${i+1}</span>
+                   <div>
+                     <button onclick="playIndex(${i})">Play</button>
+                     <button onclick="removeSong(${i})">Remove</button>
+                   </div>`;
     plDiv.appendChild(div);
   });
 }
 
 function playIndex(i){
-  currentIndex = i;
-  const videoId = playlist[i].videoId;
+  currentIndex=i;
+  const videoId=playlist[i];
   playAudio(videoId);
 }
 
 function playAudio(videoId){
-  // Use hidden iframe for audio only
-  const url = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0&loop=1&playlist=${videoId}`;
-  document.getElementById("ytframe").src = url;
+  // Audio-only via hidden iframe
+  const url=`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0&loop=1&playlist=${videoId}`;
+  document.getElementById("ytframe").src=url;
 }
 
 function removeSong(index){
@@ -106,13 +113,13 @@ function removeSong(index){
 
 function next(){
   if(playlist.length===0) return;
-  currentIndex = (currentIndex + 1) % playlist.length;
+  currentIndex=(currentIndex+1)%playlist.length;
   playIndex(currentIndex);
 }
 
 function prev(){
   if(playlist.length===0) return;
-  currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+  currentIndex=(currentIndex-1+playlist.length)%playlist.length;
   playIndex(currentIndex);
 }
 </script>
