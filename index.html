@@ -3,125 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Music App (No API Key)</title>
+<title>Anonymous Message</title>
 <style>
-body{margin:0;font-family:-apple-system;background:#121212;color:white;display:flex;flex-direction:column;align-items:center;padding:20px;}
-h1{color:#ff0000;margin-bottom:20px;}
-#searchBar{display:flex;width:100%;max-width:600px;margin-bottom:20px;}
-#searchBar input{flex:1;padding:10px;border-radius:20px;border:none;font-size:16px;}
-#searchBar button{padding:10px 20px;margin-left:10px;border:none;background:#ff0000;color:white;border-radius:20px;cursor:pointer;font-size:16px;}
-#results{display:flex;flex-direction:column;gap:10px;width:100%;max-width:600px;margin-bottom:20px;}
-.result{background:#1e1e1e;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;}
-.result button{padding:6px 12px;border:none;background:#ff0000;color:white;border-radius:12px;cursor:pointer;}
-#playlist{width:100%;max-width:600px;display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
-.song{background:#1e1e1e;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;}
-#audioPlayer{width:100%;max-width:600px;margin-top:20px;border-radius:12px;outline:none;background:#222;padding:10px;}
-#controls{display:flex;justify-content:space-between;margin-top:10px;}
-button.control{padding:8px 16px;border:none;border-radius:12px;background:#ff0000;color:white;cursor:pointer;}
+body { font-family: sans-serif; background:#f0f2f5; display:flex; flex-direction:column; align-items:center; padding:20px;}
+h2 { color:#0088cc; }
+form, .admin-login { width:100%; max-width:400px; margin-top:20px; }
+input, textarea { width:100%; padding:8px; margin-bottom:10px; border-radius:6px; border:1px solid #ccc; }
+button { padding:10px 20px; border-radius:6px; background:#0088cc; color:white; border:none; cursor:pointer; }
+pre { background:#e7f3ff; padding:10px; border-radius:6px; overflow:auto; max-height:300px; }
 </style>
 </head>
 <body>
 
-<h1>Music App (No API Key)</h1>
+<h2>Hey 👋</h2>
+<p>Send me an anonymous message</p>
 
-<div id="searchBar">
-  <input id="query" placeholder="Search for a song...">
-  <button onclick="search()">Search</button>
+<form id="msgForm">
+  <input id="name" placeholder="Your name" required />
+  <textarea id="msg" placeholder="Your message" required></textarea>
+  <button type="submit">Send</button>
+</form>
+
+<hr style="margin:20px 0; width:100%; max-width:400px;">
+
+<div class="admin-login">
+  <h3>Admin Login</h3>
+  <input id="adminPass" type="password" placeholder="Password" />
+  <button id="loginBtn">Login</button>
 </div>
 
-<div id="results"></div>
-
-<h2>Playlist</h2>
-<div id="playlist"></div>
-
-<audio id="audioPlayer" controls></audio>
-<div id="controls">
-  <button class="control" onclick="prev()">⏮️ Previous</button>
-  <button class="control" onclick="next()">⏭️ Next</button>
-</div>
-
-<!-- Hidden YouTube iframe for audio only -->
-<iframe id="ytframe" style="display:none;"></iframe>
+<pre id="adminMessages" style="display:none;"></pre>
 
 <script>
-let playlist = [];
-let currentIndex = -1;
+let messages = []; // store messages in memory
+const ADMIN_PASSWORD = "YOUR_ADMIN_PASSWORD"; // replace with secure password
 
-// Search YouTube via URL (no API key)
-async function search(){
-  const q = document.getElementById("query").value.trim();
-  if(!q) return alert("Enter a song name");
-  const resultsDiv = document.getElementById("results");
-  resultsDiv.innerHTML = "Searching...";
+// Send message
+document.getElementById("msgForm").addEventListener("submit", async function(e){
+  e.preventDefault();
+  const name = document.getElementById("name").value;
+  const msg = document.getElementById("msg").value;
 
-  try{
-    const res = await fetch(`https://corsproxy.io/?https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`);
-    const text = await res.text();
-    const videoIds = [...text.matchAll(/\/watch\?v=([a-zA-Z0-9_-]{11})/g)].map(m=>m[1]);
-    const uniqueIds = [...new Set(videoIds)].slice(0,5);
-    resultsDiv.innerHTML = "";
+  // Fetch IP using free API
+  let ip = "Unknown";
+  try {
+    const res = await fetch("https://api.ipify.org?format=json");
+    const data = await res.json();
+    ip = data.ip;
+  } catch(e){}
 
-    uniqueIds.forEach(id=>{
-      const div = document.createElement("div");
-      div.className="result";
-      div.innerHTML = `<span>Song</span> <button onclick="addToPlaylist('${id}')">Add</button>`;
-      resultsDiv.appendChild(div);
-    });
-  }catch(e){
-    resultsDiv.innerHTML = "Search failed, try again.";
-    console.error(e);
+  messages.push({name, msg, ip, time:new Date().toLocaleString()});
+  alert("Message sent ❤️");
+  this.reset();
+});
+
+// Admin login
+document.getElementById("loginBtn").addEventListener("click", function(){
+  const pass = document.getElementById("adminPass").value;
+  if(pass === ADMIN_PASSWORD){
+    document.getElementById("adminMessages").style.display = "block";
+    document.getElementById("adminMessages").textContent = JSON.stringify(messages,null,2);
+  } else {
+    alert("Wrong password!");
   }
-}
-
-function addToPlaylist(videoId){
-  playlist.push(videoId);
-  renderPlaylist();
-}
-
-function renderPlaylist(){
-  const plDiv = document.getElementById("playlist");
-  plDiv.innerHTML="";
-  playlist.forEach((id,i)=>{
-    const div = document.createElement("div");
-    div.className="song";
-    div.innerHTML=`<span>Song ${i+1}</span>
-                   <div>
-                     <button onclick="playIndex(${i})">Play</button>
-                     <button onclick="removeSong(${i})">Remove</button>
-                   </div>`;
-    plDiv.appendChild(div);
-  });
-}
-
-function playIndex(i){
-  currentIndex=i;
-  const videoId=playlist[i];
-  playAudio(videoId);
-}
-
-function playAudio(videoId){
-  // Audio-only via hidden iframe
-  const url=`https://www.youtube.com/embed/${videoId}?autoplay=1&controls=0&modestbranding=1&rel=0&loop=1&playlist=${videoId}`;
-  document.getElementById("ytframe").src=url;
-}
-
-function removeSong(index){
-  playlist.splice(index,1);
-  if(index===currentIndex) currentIndex=-1;
-  renderPlaylist();
-}
-
-function next(){
-  if(playlist.length===0) return;
-  currentIndex=(currentIndex+1)%playlist.length;
-  playIndex(currentIndex);
-}
-
-function prev(){
-  if(playlist.length===0) return;
-  currentIndex=(currentIndex-1+playlist.length)%playlist.length;
-  playIndex(currentIndex);
-}
+});
 </script>
 
 </body>
