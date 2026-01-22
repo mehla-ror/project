@@ -2,123 +2,53 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Secret Weather Chat</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube Music Player</title>
 <style>
-body{margin:0;font-family:-apple-system;background:#f0f2f5}
-#weather,#chat,#admin{display:none;height:100vh}
-iframe{width:100%;height:100%;border:none}
-#search{position:fixed;top:15px;right:15px;font-size:22px;background:#fff;padding:10px;border-radius:50%;cursor:pointer}
-#chatHeader{background:#0084ff;color:#fff;padding:12px;font-weight:bold}
-#messages{height:calc(100vh - 110px);overflow-y:auto;padding:10px}
-.msg{margin:6px 0;padding:10px;border-radius:16px;max-width:70%}
-.me{background:#0084ff;color:#fff;margin-left:auto}
-.other{background:#fff}
-#input{display:flex;padding:8px;background:#fff}
-#input input{flex:1;border:none;padding:10px;border-radius:20px;background:#eee}
-#input button{border:none;background:#0084ff;color:#fff;margin-left:6px;border-radius:50%;padding:10px}
-#pinned{background:#e7f3ff;padding:8px;margin:6px;border-radius:10px;display:none}
-pre{white-space:pre-wrap;padding:10px}
+body{margin:0;font-family:-apple-system;background:#f0f2f5;display:flex;flex-direction:column;align-items:center;padding:20px;}
+h1{color:#ff0000;text-align:center;}
+#searchBar{display:flex;width:100%;max-width:600px;margin-bottom:20px;}
+#searchBar input{flex:1;padding:10px;border-radius:20px;border:1px solid #ccc;font-size:16px;}
+#searchBar button{padding:10px 20px;margin-left:10px;border:none;background:#ff0000;color:white;border-radius:20px;cursor:pointer;font-size:16px;}
+#results{display:flex;flex-direction:column;gap:15px;width:100%;max-width:600px;}
+.result{background:white;padding:10px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+.result button{padding:6px 12px;border:none;background:#ff0000;color:white;border-radius:12px;cursor:pointer;}
+iframe{width:100%;height:360px;border:none;margin-top:20px;border-radius:12px;}
 </style>
 </head>
-
 <body>
 
-<div id="weather">
-  <div id="search">🔐</div>
-  <iframe src="https://wttr.in/?format=3"></iframe>
+<h1>YouTube Music Player</h1>
+
+<div id="searchBar">
+  <input id="query" placeholder="Search for a song...">
+  <button onclick="search()">Search</button>
 </div>
 
-<div id="chat">
-  <div id="chatHeader">Secret Chat</div>
-  <div id="pinned"></div>
-  <div id="messages"></div>
-  <div id="input">
-    <input id="text" placeholder="Type message...">
-    <button onclick="send()">➤</button>
-  </div>
-</div>
+<div id="results"></div>
 
-<div id="admin">
-  <div id="chatHeader">Admin Panel</div>
-  <pre id="log"></pre>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<div id="player"></div>
 
 <script>
-/* 🔥 FIREBASE CONFIG */
-firebase.initializeApp({
-  apiKey: "AIzaSyClDpYNMrZMCBFlAYjFHdWAJRvTlpmRjds",
-  databaseURL: "https://secret-app-c988f-default-rtdb.firebaseio.com"
-});
-const db = firebase.database();
-const msgRef = db.ref("messages");
-const pinRef = db.ref("pinned");
-
-/* 🔐 AUTH */
-const auth = sessionStorage.getItem("auth");
-const user = sessionStorage.getItem("user") || "Guest";
-
-document.getElementById("search").onclick = () => {
-  const code = prompt("Enter secret code");
-  if(code==="BAG@777"){
-    sessionStorage.setItem("auth","user");
-    sessionStorage.setItem("user",prompt("Your name")||"Guest");
-    startChat();
-  } 
-  else if(code==="JAMESON@420"){
-    sessionStorage.setItem("auth","admin");
-    startAdmin();
-  }
-};
-
-if(auth==="user") startChat();
-else if(auth==="admin") startAdmin();
-else showWeather();
-
-function showWeather(){
-  weather.style.display="block";
-}
-
-/* 💬 CHAT */
-function startChat(){
-  weather.style.display="none";
-  chat.style.display="block";
-
-  msgRef.limitToLast(50).on("child_added", s=>{
-    const m=s.val();
-    const d=document.createElement("div");
-    d.className="msg "+(m.user===user?"me":"other");
-    d.innerText=m.user+": "+m.text;
-    messages.appendChild(d);
-    messages.scrollTop=messages.scrollHeight;
-  });
-
-  pinRef.on("value", s=>{
-    if(s.val()){
-      pinned.style.display="block";
-      pinned.innerText="📌 "+s.val().text;
-    } else pinned.style.display="none";
+async function search(){
+  const query = document.getElementById("query").value;
+  if(!query) return alert("Enter song name");
+  const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=5&q=${encodeURIComponent(query)}&key=YOUR_API_KEY`);
+  const data = await res.json();
+  const resultsDiv = document.getElementById("results");
+  resultsDiv.innerHTML = "";
+  data.items.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "result";
+    div.innerHTML = `<span>${item.snippet.title}</span><button onclick="play('${item.id.videoId}')">Play</button>`;
+    resultsDiv.appendChild(div);
   });
 }
 
-function send(){
-  if(!text.value) return;
-  msgRef.push({user,text:text.value,time:Date.now()});
-  text.value="";
-}
-
-/* 👑 ADMIN */
-function startAdmin(){
-  weather.style.display="none";
-  admin.style.display="block";
-  msgRef.on("value", s=>{
-    log.innerText = JSON.stringify(s.val(),null,2);
-  });
+function play(videoId){
+  document.getElementById("player").innerHTML = `<iframe src="https://www.youtube.com/embed/${videoId}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
 }
 </script>
+
 </body>
 </html>
